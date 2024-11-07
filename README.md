@@ -24,6 +24,7 @@ There are two predefined subject: WEATHER and the NEWS
 Operation | Client Message  | Server Response
 
 ===============================================
+
 CONNECT     <NAME, CONN>       <CONN_ACK> 
 SUBSCRIBE  <CLIENT_NAME, SUB,  <SUB_ACK> 
             SUBJECT>      
