@@ -29,3 +29,11 @@ There are two predefined subject: WEATHER and the NEWS
 | PUBLISH   | <CLIENT_NAME, PUB,|(Forwards message)|
 |           |  SUBJECT, MSG>    | OR ERROR         |
 | DISCONNECT|  <DISC>           |   <DISC_ACK>     |
+
+Completed Parts (Phase 1):
+The code so far passes all the tests in phase 1 when connecting to the server using different client connections, and receives the correct responses back. 
+
+Unfinished Sections (Phase 1):
+- Does not handle offline users
+- Need to work out the flow of control when polling for readable data from the socket. I want it so that the user is prompted to enter commands with ">>" and ...
+(continued) when a message is forwarded to subscribers that data is instantly printed to the screen. Might change by saving the message in a var and print it later.
