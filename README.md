@@ -32,6 +32,8 @@ There are two predefined subject: WEATHER and the NEWS
 
 Completed Parts (Phase 1):
 The code so far passes all the tests in phase 1 when connecting to the server using different client connections, and receives the correct responses back. 
+The client connecion must be made seperately from different terminal sessions to execute properly. 
+The server can run once and will stay on until a SIGINT/SIGKILL signal is received. 
 
 Unfinished Sections (Phase 1):
 - Does not handle offline users
