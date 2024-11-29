@@ -74,13 +74,8 @@ def thread_process(connectionSocket):
         print("IO Error")
         connectionSocket.close()
 
-def main():
-    print("Ready to connect... ") 
-    while True:
-        connectionSocket, addr = serverSocket.accept() 
-        thread = threading.Thread(target=thread_process, args = (connectionSocket, ))
-        thread.start()
-
-if __name__ == "__main__":
-    main() 
-
+print("Ready to connect... ") 
+while True:
+    connectionSocket, addr = serverSocket.accept() 
+    thread = threading.Thread(target=thread_process, args = (connectionSocket, ))
+    thread.start()
