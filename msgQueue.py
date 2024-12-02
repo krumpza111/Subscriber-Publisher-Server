@@ -72,23 +72,7 @@ class msgQueue:
                 curr_index += 1
 
             self.index_map[user_name] = self.size
-        #removed the cleanup
         return new_messages
-    
-    def cleanup(self):
-        with self.lock:
-            if not self.index_map:
-                return 
-            min_index = min(self.index_map.values()) 
-            
-            curr_index = 0 
-            while self.head and curr_index < min_index:
-                self.head = self.head.next 
-                curr_index += 1 
-                self.size -= 1 
-
-            for user in self.index_map:
-                self.index_map[user] -= min_index
             
       
 

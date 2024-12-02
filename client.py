@@ -3,7 +3,7 @@ import select
 import sys
 
 serverName = '127.0.0.1' 
-serverPort = 4082
+serverPort = 4084
 clientSocket = socket(AF_INET, SOCK_STREAM) 
 clientSocket.connect((serverName, serverPort))
 
@@ -39,7 +39,8 @@ def main():
                         elif source == sys.stdin:
                             user_input = input()
                             token_arr = [x.strip() for x in user_input.split(',')] 
-                            if token_arr[0] == 'DISC':
+                            #print("Token array 1st token: " + token_arr[0])
+                            if token_arr[0] == '<DISC>':
                                 clientSocket.send(token_arr[0].encode()) 
                                 data = clientSocket.recv(1024).decode() 
                                 print("Server Response: " + str(data))
@@ -61,11 +62,9 @@ def main():
                                 # Subscriber 
                                 outputdata = f'<{user_name}, {token_arr[1]}, {token_arr[2]}>' 
                                 clientSocket.send(outputdata.encode()) 
-                                data = clientSocket.recv(9).decode()
-                                if data == '<SUB_ACK>':
-                                    print("Server Response: " + str(data))
-                                else:
-                                    print("Error: SUB_ACK not received")
+                                data = clientSocket.recv(64).decode()
+                                print("Server Response: " + str(data))
+                                print()
                 except Exception as e:
                     print(f"Error: {e}")
                     break

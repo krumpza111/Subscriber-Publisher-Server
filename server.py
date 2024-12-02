@@ -4,7 +4,7 @@ import time
 from msgQueue import msgQueue, Node
 
 HOST = '127.0.0.1'
-PORT = 4082
+PORT = 4084
 
 num_threads = 0
 
@@ -64,7 +64,6 @@ def producer_thread_func(connectionSocket, user_name):
                 # Forward data to subscribers who are online 
                 queues[topic].enqueue(message)
                 for user in active_clients:
-                    print("Client is: " + user) 
                     if user in queues[topic].index_map:
                         queues[topic].index_map[user] += 1
                         connection = active_clients[user] 
@@ -88,7 +87,23 @@ def consumer_thread_func(connectionSocket, user_name):
         while True:
             #Accept requests from the client
             try:
+                # Get all missed messages out to the subscriber
+                for topic in topics:
+                    if user_name in queues[topic].index_map:
+                        messages = queues[topic].get_messages(user_name) 
+                        if not messages:
+                            break
+                        if messages:
+                            #Sending messages out 
+                            for msg in messages:
+                                try:
+                                    connectionSocket.send(msg.encode())
+                                except Exception as e:
+                                    print(f"Error sending message to {user_name}: {e}")
+                                    break
                 request = connectionSocket.recv(1024).decode()
+                if request is None:
+                    continue
 
                 #Break down request and tokenize it
                 request_str = request.strip('<>')
@@ -99,6 +114,9 @@ def consumer_thread_func(connectionSocket, user_name):
                 if token_arr[0] == 'DISC':
                     response = '<DISC_ACK>' 
                     connectionSocket.send(response.encode()) 
+                    del active_clients[user_name]
+                    if user_name in active_clients:
+                        print("Error: Didnt delete properly")
                     break
 
                 # request data we need
@@ -112,25 +130,15 @@ def consumer_thread_func(connectionSocket, user_name):
                         queues[topic].index_map[user_name] = 0
                     response = '<SUB_ACK>'
                     connectionSocket.send(response.encode())
-                    while True:
-                        # Get all missed messages out to the subscriber
-                        messages = queues[topic].get_messages(user_name) 
-                        if messages:
-                            print("Sending messages now")
-                            for msg in messages:
-                                try:
-                                    connectionSocket.send(msg.encode())
-                                except Exception as e:
-                                    print(f"Error sending message to {user_name}: {e}")
-                                    break
-                            break
-                        else:
-                            print("No new messages")
+                    continue
                 else:
                     # maybe return an error statement instead
-                    print("Not a valid topic to subscribe to")
-            except socket.timeout:
-                print(f"Timedout waiting for data, closing connection") 
+                    response = "ERROR: Subscription Failed - Subject Not Found"
+                    connectionSocket.send(response.encode())
+                    continue
+            
+            except Exception as e:
+                print(f"Error seen now: {e}")
                 break
     except IOError:
         print("IO Error")
@@ -138,11 +146,17 @@ def consumer_thread_func(connectionSocket, user_name):
     return 
 
 def handle_connection(connectionSocket, user_name):
-    if user_name in active_clients:
+    if user_name in active_clients.keys():
         old_connection = active_clients[user_name]
-        return old_connection
+        try:
+            old_connection.close()
+        except Exception as e:
+            print(f"Error closing old connection for {user_name}: {e}")
+        active_clients[user_name] = connectionSocket
+        return True
     else:
-        return connectionSocket
+        active_clients[user_name] = connectionSocket
+        return False
 
 def main():
     global num_threads
@@ -158,23 +172,22 @@ def main():
             request = connectionSocket.recv(1024).decode().strip('<>')
             print("Request message: " + request)
             token_arr = [x.strip() for x in request.split(',')] 
+            user_name = token_arr[0]
             if token_arr[1] == "CONN":
                 connectionSocket.send("<CONN_ACK>".encode())
+                if user_name in active_clients.keys():
+                    response = "Error: user is already connected, choose another user name"
+                    connectionSocket.send(response.encode())
             elif token_arr[1] == "RECONNECT":
                 connectionSocket.send("<RECONNECT_ACK>".encode())
-            user_name = token_arr[0]
-            if user_name in active_clients.keys():
-                response = "Error: user is already connected, choose another user name"
-                connectionSocket.send(response.encode())
 
             thread_type = user_name.split(maxsplit=1)[0]
-            connectionSocket = handle_connection(connectionSocket, user_name)
             #connectionSocket.settimeout(180) # 3 minute timeout
             if thread_type == "Publisher" or thread_type == "Pub":
                 thread = threading.Thread(target=producer_thread_func, args=(connectionSocket, user_name, ))
             elif thread_type == "Subscriber" or thread_type == "Sub":
-                thread = threading.Thread(target=consumer_thread_func, args=(connectionSocket, user_name, ))
                 active_clients[user_name] = connectionSocket
+                thread = threading.Thread(target=consumer_thread_func, args=(connectionSocket, user_name, ))
             else:
                 print("Invalid thread type ")
                 break 
