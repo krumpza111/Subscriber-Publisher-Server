@@ -3,7 +3,7 @@ import select
 import sys
 
 serverName = '127.0.0.1' 
-serverPort = 4080
+serverPort = 4082
 clientSocket = socket(AF_INET, SOCK_STREAM) 
 clientSocket.connect((serverName, serverPort))
 
