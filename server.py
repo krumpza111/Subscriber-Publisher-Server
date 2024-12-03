@@ -1,19 +1,18 @@
 from socket import * 
 import threading 
-import time
-from msgQueue import msgQueue, Node
+import sys
+from msgQueue import msgQueue
 
+# Globals
 HOST = '127.0.0.1'
-PORT = 4084
+PORT = 4084 # default port number being used
 
-num_threads = 0
+# Data storage
+topics = ['WEATHER', 'NEWS'] # Topics available to subscribe & publish 
+active_clients = {} # Format {'user_name': connectionSocket}
+queues = {} # Format {'topic': queue for topic 't }
 
-subscribers = {'WEATHER': {}, 'NEWS': {}} 
-topics = ['WEATHER', 'NEWS']
-messages = {'WEATHER': [], 'NEWS' : []}
-active_clients = {} # Format {'user_name': (ConnectionSocket, thread)}
-
-queues = {}
+# Creates a message queue for each topic available
 for t in topics:
     queues[t] = msgQueue(t)
     
@@ -32,22 +31,22 @@ def producer_thread_func(connectionSocket, user_name):
                 print("Request message: " + request_str)
                 token_arr = [x.strip() for x in request_str.split(',')] 
 
-                #If a disconnect is received 
+                #If a disconnect is received send response and break from loop
                 if token_arr[0] == 'DISC':
                     response = '<DISC_ACK>' 
                     connectionSocket.send(response.encode()) 
                     break
 
-                # request data we need
-                topic = token_arr[2]
-                message = token_arr[3]
+                # request data we need to process
+                topic = token_arr[1]
+                message = token_arr[2]
 
                 if topic not in topics:
                     response = '<ERROR: Subject not found>'
                     connectionSocket.send(response.encode()) 
 
                 # if not subscribed check if publisher is subscribed to another topic
-                # if so send an error message back, or subscribe to topic
+                # if yes then send an error back
                 if user_name not in queues[topic].index_map:
                     prev_subbed = False
                     for t in topics:
@@ -58,11 +57,14 @@ def producer_thread_func(connectionSocket, user_name):
                         response = '<ERROR: Not Subscribed>' 
                         connectionSocket.send(response.encode())
                     else:
+                        # Adds producer to this topics message queue
                         queues[topic].producers.append(user_name)
 
                 # Begin publisher operations 
-                # Forward data to subscribers who are online 
+                # Add message to the queue
                 queues[topic].enqueue(message)
+
+                # Forward data to subscribers who are online 
                 for user in active_clients:
                     if user in queues[topic].index_map:
                         queues[topic].index_map[user] += 1
@@ -70,8 +72,8 @@ def producer_thread_func(connectionSocket, user_name):
                         connection.send(message.encode())
                         
                 print("Messages published and forwarded")
-            except socket.timeout:
-                print("Request message was empty") 
+            except Exception as e:
+                print(f"Error: {e}")
                 break
     except IOError:
         print("IO Error")
@@ -85,13 +87,13 @@ these threads are designated to those who are subscribers on the server
 def consumer_thread_func(connectionSocket, user_name):
     try:
         while True:
-            #Accept requests from the client
+            #Accepting requests from the client
             try:
-                # Get all missed messages out to the subscriber
+                # Get any missed messages out to the subscriber
                 for topic in topics:
                     if user_name in queues[topic].index_map:
                         messages = queues[topic].get_messages(user_name) 
-                        if not messages:
+                        if messages is None:
                             break
                         if messages:
                             #Sending messages out 
@@ -101,6 +103,8 @@ def consumer_thread_func(connectionSocket, user_name):
                                 except Exception as e:
                                     print(f"Error sending message to {user_name}: {e}")
                                     break
+
+                # Receive request from client
                 request = connectionSocket.recv(1024).decode()
                 if request is None:
                     continue
@@ -110,13 +114,11 @@ def consumer_thread_func(connectionSocket, user_name):
                 print("Request message: " + request_str)
                 token_arr = [x.strip() for x in request_str.split(',')] 
 
-                #If a disconnect is received 
+                #If a disconnect is received, remove the user from active clients and exit loop
                 if token_arr[0] == 'DISC':
                     response = '<DISC_ACK>' 
                     connectionSocket.send(response.encode()) 
                     del active_clients[user_name]
-                    if user_name in active_clients:
-                        print("Error: Didnt delete properly")
                     break
 
                 # request data we need
@@ -126,7 +128,7 @@ def consumer_thread_func(connectionSocket, user_name):
                 # Subscribe to a topic and consume data from message queue
                 if topic in topics:
                     #adding client name to subscriber list 
-                    if user_name not in queues[topic].index_map:
+                    if user_name not in queues[topic].index_map.keys():
                         queues[topic].index_map[user_name] = 0
                     response = '<SUB_ACK>'
                     connectionSocket.send(response.encode())
@@ -145,34 +147,34 @@ def consumer_thread_func(connectionSocket, user_name):
         connectionSocket.close()
     return 
 
-def handle_connection(connectionSocket, user_name):
-    if user_name in active_clients.keys():
-        old_connection = active_clients[user_name]
-        try:
-            old_connection.close()
-        except Exception as e:
-            print(f"Error closing old connection for {user_name}: {e}")
-        active_clients[user_name] = connectionSocket
-        return True
-    else:
-        active_clients[user_name] = connectionSocket
-        return False
-
+'''
+Main server loop:
+1. Handles accepting client connections, and sending ACK responses
+2. Adds user to the active clients list
+3. Creates thread based on if the client is a publisher or subscriber
+- Can exit using SIGINT
+'''
 def main():
-    global num_threads
+    # Setting up and listening on port
     serverSocket = socket(AF_INET, SOCK_STREAM) 
     serverSocket.bind((HOST, PORT)) 
     serverSocket.listen() 
-    print("Ready to connect... ") 
+    print(f"Ready to connect on port {PORT}... ") 
     
     while True:
         try:
+            # main accept loop
             connectionSocket, addr = serverSocket.accept() 
             print("Connected ... ")
+
             request = connectionSocket.recv(1024).decode().strip('<>')
             print("Request message: " + request)
+
+            # Split the request into tokens
             token_arr = [x.strip() for x in request.split(',')] 
             user_name = token_arr[0]
+
+            # Process connection and reconnection of user
             if token_arr[1] == "CONN":
                 connectionSocket.send("<CONN_ACK>".encode())
                 if user_name in active_clients.keys():
@@ -181,18 +183,19 @@ def main():
             elif token_arr[1] == "RECONNECT":
                 connectionSocket.send("<RECONNECT_ACK>".encode())
 
+            # Determines if users are producers or consumers
             thread_type = user_name.split(maxsplit=1)[0]
-            #connectionSocket.settimeout(180) # 3 minute timeout
-            if thread_type == "Publisher" or thread_type == "Pub":
+            thread_type = thread_type.lower()
+            if thread_type == "publisher" or thread_type == "pub":
                 thread = threading.Thread(target=producer_thread_func, args=(connectionSocket, user_name, ))
-            elif thread_type == "Subscriber" or thread_type == "Sub":
+            elif thread_type == "subscriber" or thread_type == "sub":
                 active_clients[user_name] = connectionSocket
                 thread = threading.Thread(target=consumer_thread_func, args=(connectionSocket, user_name, ))
             else:
                 print("Invalid thread type ")
                 break 
-            num_threads += 1 
             thread.start()
+
         except KeyboardInterrupt:
             print("\n Shutting down server now... ") 
             break
@@ -204,5 +207,16 @@ def main():
     print("Goodbye")
 
 if __name__ == "__main__":
+    # Check for command line PORT argument
+    if len(sys.argv) > 1:
+        try:
+            PORT = int(sys.argv[1]) 
+            if PORT < 1 or PORT > 65535:
+                raise ValueError("Port number is outside of allowable range")
+        except ValueError as e:
+            print(f"Invalid port number: {e}")
+            sys.exit(1)
+    else:
+        PORT = 4084
     main() 
 

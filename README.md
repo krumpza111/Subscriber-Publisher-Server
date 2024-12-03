@@ -1,41 +1,53 @@
 # Subscriber-Publisher-Server
 A server which displays published messages to all users subscribed 
+Usage: python3 server.py [PORT]
+Usage: python3 client.py [PORT]
 
-Server-Side Implementation:
+## Server-Side Application:
 * Always On * 
-- Listens for incoming connections from various clients simultaneously (done with threading)
-- Tokenize the request string from the client to figure what action they want to take
-- Manages subscribed clients and published messages using a dictionary and array 
-- Handles publishing and subscriber requests by forwarding data, or adding users to a subscription
+- Listens for incoming connections from various clients simultaneously (done with a thread pool)
+- Tokenize the request string from the client to figure what action(s) they want to take
+- Handles publishing and subscriber clients by using seperate producer and consumer threads
 - Maintains thread until a specific user wants to disconnect 
-  
-Client-Side Implementation:
+
+### Consumer Thread Implementation:
+- Adds subscribers to the active_clients list
+- Allows subscribers to subscribe to topics availble on the server 
+- Subscribers receive all messages to topics they have subscribed to including unseen messages 
+- Server maintains a record of the subscriber by tracking their user name and the last message from the queue received 
+- Allows exit at any time using the disconnect token and maintains subscription 
+
+### Producer Thrad Implementation:
+- Allows publishers to add messages to the queue 
+- Publishers forward messages immediately to any active clients 
+
+## Client-Side Application:
 Subscribers -> Need to subscribe to one subject before receiving messages 
 Publishers -> Publishes messages to the subject indicated to the server
+- If a port number is given the socket tries to connect to that port or uses port # 4084 as a default
 - Client is prompted to register a name and send it to the server
 - Clients establish a connection with the server (notified by a CONN_ACK token) 
 - The clientis prompted to send instructions to the server and gets server responses back
-- There is a select.select() method being used which is simaler to poll() in C ...
-(continued) It checks if data is available to read from the socket or if there is data being sent in standard input
+- There is a select.select() method being used which is simaler to poll() in C that checks if data is available to read from the socket or if there is data being sent in standard input
 - The client can end the connection at any time using a DISC token and will receive a DISC_ACK back to ensure socket is closed
 
 There are two predefined subject: WEATHER and the NEWS 
 
-| Operation | Client Message    | Server Response  |
-| --------- | ----------------- | ---------------  |
-| CONNECT   |  <NAME, CONN>     | <CONN_ACK>       |
-| SUBSCRIBE | <CLIENT_NAME, SUB,|  <SUB_ACK>       |
-|           |  SUBJECT>         |                  |
-| PUBLISH   | <CLIENT_NAME, PUB,|(Forwards message)|
-|           |  SUBJECT, MSG>    | OR ERROR         |
-| DISCONNECT|  <DISC>           |   <DISC_ACK>     |
+## Message Format: 
 
-Completed Parts (Phase 1):
-The code so far passes all the tests in phase 1 when connecting to the server using different client connections, and receives the correct responses back. 
-The client connecion must be made seperately from different terminal sessions to execute properly. 
-The server can run once and will stay on until a SIGINT/SIGKILL signal is received. 
-
-Unfinished Sections (Phase 1):
-- Does not handle offline users
-- Need to work out the flow of control when polling for readable data from the socket. I want it so that the user is prompted to enter commands with ">>" and ...
-(continued) when a message is forwarded to subscribers that data is instantly printed to the screen. Might change by saving the message in a var and print it later.
+| Operation | Client Message          | Server Response   |
+| --------- | ----------------------  | ---------------   |
+| CONNECT   |  <NAME, CONN>           | <CONN_ACK>        |
+|           |                         |                   |
+| SUBSCRIBE | <CLIENT_NAME, SUB,      |  <SUB_ACK>        |
+|           |  SUBJECT>               |                   |
+|           |                         |                   |
+| RECONNECT | <RECONNECT, CLIENT_NAME>| <RECONNECT_ACK>   | 
+|           |                         | + Queued messages |
+|           |                         |                   |
+| DISCONNECT|  <DISC>                 |<DISC_ACK> +       |
+|           |                         |Subscription saved |
+|           |                         |                   | 
+| PUBLISH   | <PUB, SUBJECT, MSG>     | (Forward to active|
+|           |                         | clients + queue if|
+|           |                         | offline)          |

@@ -2,10 +2,10 @@ from socket import *
 import select
 import sys
 
-serverName = '127.0.0.1' 
-serverPort = 4084
+HOST = '127.0.0.1' 
+PORT = 4084
 clientSocket = socket(AF_INET, SOCK_STREAM) 
-clientSocket.connect((serverName, serverPort))
+clientSocket.connect((HOST, PORT))
 
 def main():
     try:
@@ -39,7 +39,7 @@ def main():
                         elif source == sys.stdin:
                             user_input = input()
                             token_arr = [x.strip() for x in user_input.split(',')] 
-                            #print("Token array 1st token: " + token_arr[0])
+                            print("Token array 1st token: " + token_arr[0])
                             if token_arr[0] == '<DISC>':
                                 clientSocket.send(token_arr[0].encode()) 
                                 data = clientSocket.recv(1024).decode() 
@@ -76,4 +76,14 @@ def main():
                             
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        try:
+            PORT = int(sys.argv[1]) 
+            if PORT < 1 or PORT > 65535:
+                raise ValueError("Port number is outside of allowable range")
+        except ValueError as e:
+            print(f"Invalid port number: {e}")
+            sys.exit(1)
+    else:
+        PORT = 4084
     main()
