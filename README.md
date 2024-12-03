@@ -1,7 +1,7 @@
 # Subscriber-Publisher-Server
 A server which displays published messages to all users subscribed 
-Usage: python3 server.py [PORT]
-Usage: python3 client.py [PORT]
+- Usage: python3 server.py [PORT]
+- Usage: python3 client.py [PORT]
 
 ## Server-Side Application:
 * Always On * 
@@ -22,10 +22,14 @@ Usage: python3 client.py [PORT]
 - Publishers forward messages immediately to any active clients 
 
 ## Client-Side Application:
-Subscribers -> Need to subscribe to one subject before receiving messages 
-Publishers -> Publishes messages to the subject indicated to the server
+- Subscribers -> Need to subscribe to one subject before receiving messages 
+- Publishers -> Publishes messages to the subject indicated to the server
 - If a port number is given the socket tries to connect to that port or uses port # 4084 as a default
 - Client is prompted to register a name and send it to the server
+** Important ** 
+The user_name is important in determining whether you are a producer or consumer:
+Any user name starting with prefix 'Subscriber' or 'Sub' will be consumer threads (capitalization doesn't matter)
+Any user name starting with prefix 'Producer' or 'Pub' will be producer threads (capitalization doesn't matter)
 - Clients establish a connection with the server (notified by a CONN_ACK token) 
 - The clientis prompted to send instructions to the server and gets server responses back
 - There is a select.select() method being used which is simaler to poll() in C that checks if data is available to read from the socket or if there is data being sent in standard input
@@ -51,3 +55,16 @@ There are two predefined subject: WEATHER and the NEWS
 | PUBLISH   | <PUB, SUBJECT, MSG>     | (Forward to active|
 |           |                         | clients + queue if|
 |           |                         | offline)          |
+
+## Example Usage:
+    On the client-side messages are written in this format... 
+    >> <Publisher 1, CONN>
+    Server Response: <CONN_ACK>
+        >> <PUB, WEATHER, "it is sunny today"> 
+    >> 
+
+    What the subscriber client sees:
+    >> <Subscriber 1, CONN> 
+    Server Response: <CONN_ACK>
+    >> <Subscriber 1, SUB, WEATHER> 
+    Server Response: <SUB_ACK> "it is sunny today" 
