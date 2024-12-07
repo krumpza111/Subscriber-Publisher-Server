@@ -60,7 +60,7 @@ There are two predefined subject: WEATHER and the NEWS
     On the client-side messages are written in this format... 
     >> <Publisher 1, CONN>
     Server Response: <CONN_ACK>
-        >> <PUB, WEATHER, "it is sunny today"> 
+    >> <PUB, WEATHER, "it is sunny today"> 
     >> 
 
     What the subscriber client sees:
